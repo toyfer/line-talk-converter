@@ -1,307 +1,271 @@
-const $ = (id) => document.getElementById(id);
+(function () {
+  "use strict";
 
-const fileInput = $("file");
-const encodingSelect = $("encoding");
-const convertBtn = $("convert");
-const downloadCsvBtn = $("downloadCsv");
-const downloadJsonBtn = $("downloadJson");
-const downloadXmlBtn = $("downloadXml");
-const rowsEl = $("rows");
-const mobileCardsEl = $("mobileCards");
-const countEl = $("count");
-const filenameEl = $("filename");
-const emptyDateCountEl = $("emptyDateCount");
-const statusEl = $("status");
-const previewLimitLabel = $("previewLimitLabel");
-const searchEl = $("search");
+  const $ = (id) => document.getElementById(id);
 
-const PREVIEW_LIMIT = 500;
-previewLimitLabel.textContent = String(PREVIEW_LIMIT);
+  const fileInput = $("file");
+  const encodingSelect = $("encoding");
+  const convertBtn = $("convert");
+  const downloadCsvBtn = $("downloadCsv");
+  const downloadJsonBtn = $("downloadJson");
+  const downloadXmlBtn = $("downloadXml");
+  const rowsEl = $("rows");
+  const mobileCardsEl = $("mobileCards");
+  const countEl = $("count");
+  const filenameEl = $("filename");
+  const emptyDateCountEl = $("emptyDateCount");
+  const statusEl = $("status");
+  const previewLimitLabel = $("previewLimitLabel");
+  const searchEl = $("search");
 
-let records = [];
-let filteredRecords = [];
-let originalFileName = "";
+  const PREVIEW_LIMIT = LineTalkParser.PREVIEW_LIMIT;
+  previewLimitLabel.textContent = String(PREVIEW_LIMIT);
 
-convertBtn.addEventListener("click", async () => {
-  const file = fileInput.files?.[0];
-  if (!file) {
-    setStatus("ファイルを選択してください");
-    return;
+  let state = {
+    records: [],
+    filtered: [],
+    originalFileName: ""
+  };
+
+  convertBtn.addEventListener("click", onConvert);
+  searchEl.addEventListener("input", onSearch);
+  downloadCsvBtn.addEventListener("click", onDownloadCsv);
+  downloadJsonBtn.addEventListener("click", onDownloadJson);
+  downloadXmlBtn.addEventListener("click", onDownloadXml);
+
+  function setStatus(text) {
+    statusEl.textContent = text;
   }
 
-  try {
-    originalFileName = file.name;
-    filenameEl.textContent = `${file.name} (${formatFileSize(file.size)})`;
-
-    setStatus("読み込み中...");
-    const text = await readFileAsText(file, encodingSelect.value);
-
-    setStatus("解析中...");
-    records = parseLineTalk(text);
-    filteredRecords = [...records];
-
-    const emptyDateCount = records.filter((r) => !r.date).length;
-    countEl.textContent = String(records.length);
-    emptyDateCountEl.textContent = String(emptyDateCount);
-
-    renderAll(filteredRecords);
-
-    setDownloadEnabled(records.length > 0);
-
-    if (records.length === 0) {
-      setStatus("メッセージを検出できませんでした");
-    } else if (emptyDateCount > 0) {
-      setStatus(`完了: ${records.length}件（date空 ${emptyDateCount}件）`);
-    } else {
-      setStatus(`完了: ${records.length}件`);
-    }
-  } catch (e) {
-    console.error(e);
-    setStatus("エラー: 読み込みまたは解析に失敗しました");
-  }
-});
-
-searchEl.addEventListener("input", () => {
-  const keyword = searchEl.value.trim().toLowerCase();
-
-  if (!keyword) {
-    filteredRecords = [...records];
-  } else {
-    filteredRecords = records.filter((r) => {
-      return (
-        r.sender.toLowerCase().includes(keyword) ||
-        r.message.toLowerCase().includes(keyword) ||
-        r.date.toLowerCase().includes(keyword)
-      );
+  function setDownloadEnabled(enabled) {
+    [downloadCsvBtn, downloadJsonBtn, downloadXmlBtn].forEach((btn) => {
+      btn.disabled = !enabled;
     });
   }
 
-  renderAll(filteredRecords);
-});
-
-downloadCsvBtn.addEventListener("click", () => {
-  if (!records.length) return;
-  const csv = toCSV(records);
-  downloadWithOriginalName(".csv", csv, "text/csv;charset=utf-8;");
-});
-
-downloadJsonBtn.addEventListener("click", () => {
-  if (!records.length) return;
-  const json = JSON.stringify(records, null, 2);
-  downloadWithOriginalName(".json", json, "application/json;charset=utf-8;");
-});
-
-downloadXmlBtn.addEventListener("click", () => {
-  if (!records.length) return;
-  const xml = toXML(records);
-  downloadWithOriginalName(".xml", xml, "application/xml;charset=utf-8;");
-});
-
-function setStatus(text) {
-  statusEl.textContent = text;
-}
-
-function setDownloadEnabled(enabled) {
-  [downloadCsvBtn, downloadJsonBtn, downloadXmlBtn].forEach((btn) => {
-    btn.disabled = !enabled;
-  });
-}
-
-function readFileAsText(file, encoding = "utf-8") {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result || "");
-    reader.onerror = reject;
-    reader.readAsText(file, encoding);
-  });
-}
-
-function parseLineTalk(text) {
-  const lines = text
-    .replace(/\r\n/g, "\n")
-    .replace(/\r/g, "\n")
-    .split("\n");
-
-  const records = [];
-
-  // 日付行だけが単独で現れ、その後のメッセージに適用される
-  const dateLineRe = /^(\d{4})\/(\d{2})\/(\d{2})\([^)]+\)$/;
-  const messageLineRe = /^(\d{1,2}:\d{2})\t([^\t]+)\t([\s\S]*)$/;
-
-  let currentDate = "";
-  let currentRecord = null;
-
-  for (const rawLine of lines) {
-    const line = rawLine ?? "";
-    const trimmed = line.trim();
-
-    if (!trimmed) continue;
-    if (trimmed.startsWith("[LINE]")) continue;
-    if (trimmed.startsWith("保存日時")) continue;
-
-    const dateMatch = trimmed.match(dateLineRe);
-    if (dateMatch) {
-      currentDate = `${dateMatch[1]}-${dateMatch[2]}-${dateMatch[3]}`;
-      currentRecord = null;
-      continue;
+  async function onConvert() {
+    const file = fileInput.files?.[0];
+    if (!file) {
+      setStatus("ファイルを選択してください");
+      return;
     }
 
-    const msgMatch = line.match(messageLineRe);
-    if (msgMatch) {
-      currentRecord = {
-        date: currentDate,
-        time: normalizeTime(msgMatch[1]),
-        sender: msgMatch[2].trim(),
-        message: msgMatch[3] ?? ""
-      };
-      records.push(currentRecord);
-      continue;
-    }
+    try {
+      setStatus("読み込み中...");
+      state.originalFileName = file.name;
+      filenameEl.textContent = `${file.name} (${formatFileSize(file.size)})`;
 
-    if (currentRecord) {
-      currentRecord.message += "\n" + line;
+      const text = await readFileAsText(file, encodingSelect.value || "utf-8");
+
+      setStatus("解析中...");
+      const result = LineTalkParser.parse(text);
+
+      state.records = result.records;
+      state.filtered = [...result.records];
+
+      countEl.textContent = String(result.meta.recordCount);
+      emptyDateCountEl.textContent = String(result.meta.emptyDateCount);
+
+      renderAll(state.filtered);
+      setDownloadEnabled(result.meta.recordCount > 0);
+
+      if (result.meta.recordCount === 0) {
+        setStatus("メッセージを検出できませんでした。文字コードやファイル形式を確認してください");
+      } else if (result.meta.emptyDateCount > 0) {
+        setStatus(`完了: ${result.meta.recordCount}件（date空 ${result.meta.emptyDateCount}件）`);
+      } else {
+        setStatus(`完了: ${result.meta.recordCount}件`);
+      }
+    } catch (error) {
+      console.error(error);
+      setStatus("エラー: 読み込みまたは解析に失敗しました");
+      setDownloadEnabled(false);
     }
   }
 
-  return records;
-}
+  function onSearch() {
+    const keyword = String(searchEl.value || "").trim().toLowerCase();
 
-function normalizeTime(t) {
-  const [h, m] = t.split(":");
-  return `${String(h).padStart(2, "0")}:${m}`;
-}
+    if (!keyword) {
+      state.filtered = [...state.records];
+    } else {
+      state.filtered = state.records.filter((r) => {
+        return (
+          String(r.date).toLowerCase().includes(keyword) ||
+          String(r.time).toLowerCase().includes(keyword) ||
+          String(r.sender).toLowerCase().includes(keyword) ||
+          String(r.message).toLowerCase().includes(keyword)
+        );
+      });
+    }
 
-function renderAll(data) {
-  renderTable(data, PREVIEW_LIMIT);
-  renderMobileCards(data, PREVIEW_LIMIT);
-}
-
-function renderTable(data, limit = 500) {
-  rowsEl.innerHTML = "";
-
-  if (!data.length) {
-    rowsEl.innerHTML = `<tr><td colspan="4" class="empty">該当データがありません</td></tr>`;
-    return;
+    renderAll(state.filtered);
   }
 
-  const fragment = document.createDocumentFragment();
-  const max = Math.min(limit, data.length);
-
-  for (let i = 0; i < max; i++) {
-    const r = data[i];
-    const tr = document.createElement("tr");
-
-    tr.appendChild(createCell(r.date));
-    tr.appendChild(createCell(r.time));
-    tr.appendChild(createCell(r.sender));
-    tr.appendChild(createCell(r.message));
-
-    fragment.appendChild(tr);
+  function renderAll(records) {
+    renderTable(records, PREVIEW_LIMIT);
+    renderMobileCards(records, PREVIEW_LIMIT);
   }
 
-  rowsEl.appendChild(fragment);
-}
+  function renderTable(records, limit) {
+    rowsEl.innerHTML = "";
 
-function createCell(text) {
-  const td = document.createElement("td");
-  td.textContent = text ?? "";
-  return td;
-}
+    if (!records.length) {
+      rowsEl.innerHTML = `<tr><td colspan="4" class="empty">該当データがありません</td></tr>`;
+      return;
+    }
 
-function renderMobileCards(data, limit = 500) {
-  mobileCardsEl.innerHTML = "";
+    const fragment = document.createDocumentFragment();
+    const max = Math.min(limit, records.length);
 
-  if (!data.length) {
-    mobileCardsEl.innerHTML = `<div class="mobile-empty">該当データがありません</div>`;
-    return;
+    for (let i = 0; i < max; i++) {
+      const r = records[i];
+      const tr = document.createElement("tr");
+      tr.appendChild(createCell(r.date || ""));
+      tr.appendChild(createCell(r.time || ""));
+      tr.appendChild(createCell(r.sender || ""));
+      tr.appendChild(createCell(r.message || ""));
+      fragment.appendChild(tr);
+    }
+
+    rowsEl.appendChild(fragment);
   }
 
-  const fragment = document.createDocumentFragment();
-  const max = Math.min(limit, data.length);
+  function renderMobileCards(records, limit) {
+    mobileCardsEl.innerHTML = "";
 
-  for (let i = 0; i < max; i++) {
-    const r = data[i];
-    const card = document.createElement("article");
-    card.className = "mobile-card";
+    if (!records.length) {
+      mobileCardsEl.innerHTML = `<div class="mobile-empty">該当データがありません</div>`;
+      return;
+    }
 
-    const meta = document.createElement("div");
-    meta.className = "mobile-card__meta";
+    const fragment = document.createDocumentFragment();
+    const max = Math.min(limit, records.length);
 
-    const date = document.createElement("span");
-    date.textContent = r.date || "-";
+    for (let i = 0; i < max; i++) {
+      const r = records[i];
 
-    const time = document.createElement("span");
-    time.textContent = r.time || "-";
+      const card = document.createElement("article");
+      card.className = "mobile-card";
 
-    const sender = document.createElement("span");
-    sender.className = "mobile-card__sender";
-    sender.textContent = r.sender || "-";
+      const meta = document.createElement("div");
+      meta.className = "mobile-card__meta";
 
-    meta.append(date, time, sender);
+      const date = document.createElement("span");
+      date.textContent = r.date || "-";
 
-    const message = document.createElement("div");
-    message.className = "mobile-card__message";
-    message.textContent = r.message || "";
+      const time = document.createElement("span");
+      time.textContent = r.time || "-";
 
-    card.append(meta, message);
-    fragment.appendChild(card);
+      const sender = document.createElement("span");
+      sender.className = "mobile-card__sender";
+      sender.textContent = r.sender || "-";
+
+      meta.append(date, time, sender);
+
+      const message = document.createElement("div");
+      message.className = "mobile-card__message";
+      message.textContent = r.message || "";
+
+      card.append(meta, message);
+      fragment.appendChild(card);
+    }
+
+    mobileCardsEl.appendChild(fragment);
   }
 
-  mobileCardsEl.appendChild(fragment);
-}
+  function createCell(text) {
+    const td = document.createElement("td");
+    td.textContent = text;
+    return td;
+  }
 
-function toCSV(rows) {
-  const esc = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
-  const header = ["date", "time", "sender", "message"];
-  const body = rows.map((r) =>
-    [r.date, r.time, r.sender, r.message].map(esc).join(",")
-  );
-  return [header.join(","), ...body].join("\n");
-}
+  function readFileAsText(file, encoding = "utf-8") {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result || "");
+      reader.onerror = () => reject(new Error("read failed"));
+      reader.readAsText(file, encoding);
+    });
+  }
 
-function toXML(rows) {
-  const xmlEsc = (s) =>
-    String(s ?? "")
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&apos;");
+  function csvEscape(value) {
+    return `"${String(value ?? "").replace(/"/g, '""')}"`;
+  }
 
-  const items = rows
-    .map(
-      (r) => `  <message>
-    <date>${xmlEsc(r.date)}</date>
-    <time>${xmlEsc(r.time)}</time>
-    <sender>${xmlEsc(r.sender)}</sender>
-    <text>${xmlEsc(r.message)}</text>
+  function toCSV(rows) {
+    const header = ["date", "time", "sender", "message"];
+    const body = rows.map((r) =>
+      [r.date, r.time, r.sender, r.message].map(csvEscape).join(",")
+    );
+    return [header.join(","), ...body].join("\n");
+  }
+
+  function toXML(rows) {
+    const esc = (s) =>
+      String(s ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&apos;");
+
+    const items = rows
+      .map(
+        (r) => `  <message>
+    <date>${esc(r.date)}</date>
+    <time>${esc(r.time)}</time>
+    <sender>${esc(r.sender)}</sender>
+    <text>${esc(r.message)}</text>
   </message>`
-    )
-    .join("\n");
+      )
+      .join("\n");
 
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<lineTalk>\n${items}\n</lineTalk>\n`;
-}
+    return `<?xml version="1.0" encoding="UTF-8"?>\n<lineTalk>\n${items}\n</lineTalk>\n`;
+  }
 
-function downloadWithOriginalName(ext, content, mime) {
-  const base = getBaseName(originalFileName || "line_talk");
-  const filename = `${base}${ext}`;
-  const blob = new Blob([content], { type: mime });
-  const url = URL.createObjectURL(blob);
+  function onDownloadCsv() {
+    if (!state.records.length) return;
+    downloadWithOriginalName(".csv", toCSV(state.records), "text/csv;charset=utf-8;");
+  }
 
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.click();
+  function onDownloadJson() {
+    if (!state.records.length) return;
+    downloadWithOriginalName(
+      ".json",
+      JSON.stringify(state.records, null, 2),
+      "application/json;charset=utf-8;"
+    );
+  }
 
-  URL.revokeObjectURL(url);
-}
+  function onDownloadXml() {
+    if (!state.records.length) return;
+    downloadWithOriginalName(".xml", toXML(state.records), "application/xml;charset=utf-8;");
+  }
 
-function getBaseName(name) {
-  return name.replace(/\.[^/.]+$/, "");
-}
+  function downloadWithOriginalName(ext, content, mime) {
+    const base = getBaseName(state.originalFileName || "line_talk");
+    const filename = `${base}${ext}`;
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
 
-function formatFileSize(size) {
-  if (size < 1024) return `${size} B`;
-  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
-  return `${(size / (1024 * 1024)).toFixed(2)} MB`;
-}
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  function getBaseName(name) {
+    const idx = name.lastIndexOf(".");
+    return idx >= 0 ? name.slice(0, idx) : name;
+  }
+
+  function formatFileSize(size) {
+    if (size < 1024) return `${size} B`;
+    if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+    return `${(size / (1024 * 1024)).toFixed(2)} MB`;
+  }
+})();
