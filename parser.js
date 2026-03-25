@@ -1,102 +1,43 @@
-(function (global) {
-  "use strict";
-
-  const PREVIEW_LIMIT = 300;
-
-  function normalizeLineBreaks(text) {
-    return String(text || "")
-      .replace(/\r\n/g, "\n")
-      .replace(/\r/g, "\n")
-      .split("\n");
-  }
-
-  function normalizeTime(value) {
-    const parts = String(value).split(":");
-    if (parts.length !== 2) return String(value);
-    return `${String(parts[0]).padStart(2, "0")}:${String(parts[1]).padStart(2, "0")}`;
-  }
-
-  function normalizeDateFromLine(line) {
-    const m = String(line).match(/^(\d{4})\/(\d{2})\/(\d{2})\([^)]+\)$/);
-    if (!m) return "";
-    return `${m[1]}-${m[2]}-${m[3]}`;
-  }
-
-  function parseMessageLine(line) {
-    // 第一候補: 正式なタブ区切り
-    let m = String(line).match(/^(\d{1,2}:\d{2})\t([^\t]+)\t([\s\S]*)$/);
-    if (m) {
-      return {
-        time: normalizeTime(m[1]),
-        sender: String(m[2]).trim(),
-        message: m[3] ?? ""
-      };
-    }
-
-    // 第二候補: スペース複数区切りを救済
-    m = String(line).match(/^(\d{1,2}:\d{2})\s{2,}(.+?)\s{2,}([\s\S]*)$/);
-    if (m) {
-      return {
-        time: normalizeTime(m[1]),
-        sender: String(m[2]).trim(),
-        message: m[3] ?? ""
-      };
-    }
-
-    return null;
-  }
-
-  function parse(text) {
-    const lines = normalizeLineBreaks(text);
+const LineTalkParser = {
+  parse(text) {
+    const lines = text.replace(/\r\n/g, '\n').split('\n');
     const records = [];
+    let currentDate = '';
+    let lastRecord = null;
 
-    let currentDate = "";
-    let currentRecord = null;
+    const dateRe = /^(\d{4})\/(\d{1,2})\/(\d{1,2})\(.+\)$/;
+    const msgRe = /^(\d{1,2}:\d{2})\s*[\t　]+([^\t　]+?)\s*[\t　]+(.+)$/;
 
     for (const raw of lines) {
-      const line = String(raw ?? "");
-      const trimmed = line.trim();
+      const line = raw.trim();
+      if (!line) continue;
+      if (line.startsWith('[LINE]') || line.startsWith('保存日時')) continue;
 
-      if (!trimmed) continue;
-      if (trimmed.startsWith("[LINE]")) continue;
-      if (trimmed.startsWith("保存日時")) continue;
-
-      const maybeDate = normalizeDateFromLine(trimmed);
-      if (maybeDate) {
-        currentDate = maybeDate;
-        currentRecord = null;
+      const dateMatch = line.match(dateRe);
+      if (dateMatch) {
+        currentDate = `${dateMatch[1]}-${String(dateMatch[2]).padStart(2,'0')}-${String(dateMatch[3]).padStart(2,'0')}`;
+        lastRecord = null;
         continue;
       }
 
-      const parsedMessage = parseMessageLine(line);
-      if (parsedMessage) {
-        currentRecord = {
+      const msgMatch = raw.match(msgRe);
+      if (msgMatch) {
+        lastRecord = {
           date: currentDate,
-          time: parsedMessage.time,
-          sender: parsedMessage.sender,
-          message: parsedMessage.message
+          time: msgMatch[1].padStart(5, '0'),
+          sender: msgMatch[2].trim(),
+          message: msgMatch[3]
         };
-        records.push(currentRecord);
+        records.push(lastRecord);
         continue;
       }
 
-      // 継続行
-      if (currentRecord) {
-        currentRecord.message += `\n${line}`;
+      if (lastRecord) {
+        lastRecord.message += '\n' + raw;
       }
     }
-
-    return {
-      records,
-      meta: {
-        recordCount: records.length,
-        emptyDateCount: records.filter((r) => !r.date).length
-      }
-    };
+    return records;
   }
+};
 
-  global.LineTalkParser = {
-    parse,
-    PREVIEW_LIMIT
-  };
-})(window);
+window.LineTalkParser = LineTalkParser;

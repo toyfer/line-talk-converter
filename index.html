@@ -1,120 +1,70 @@
 <!doctype html>
 <html lang="ja">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>LINEトーク履歴コンバーター</title>
-    <link rel="stylesheet" href="./styles.css" />
-  </head>
-  <body>
-    <main class="app">
-      <header class="hero">
-        <div class="hero__content">
-          <p class="hero__eyebrow">LINE Export Converter</p>
-          <h1 class="hero__title">LINEトーク履歴コンバーター</h1>
-          <p class="hero__desc">
-            LINEのトーク履歴 .txt を読み込み、CSV / JSON / XML に変換します。
-            処理はブラウザ内だけで完結します。
-          </p>
-        </div>
-      </header>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LINEトーク履歴コンバーター</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="bg-gradient-to-br from-slate-50 to-blue-50 min-h-screen font-sans">
+  <div class="max-w-6xl mx-auto p-6">
+    <header class="text-center mb-10">
+      <h1 class="text-4xl font-bold text-gray-800">LINEトーク履歴コンバーター</h1>
+      <p class="text-gray-600 mt-2">ブラウザ内で完結する高機能変換ツール</p>
+    </header>
 
-      <section class="panel">
-        <div class="panel__header">
-          <h2 class="panel__title">1. ファイルを選択</h2>
-          <p class="panel__desc">
-            LINEの「トーク履歴を送信」で保存した .txt を選択してください
-          </p>
-        </div>
+    <div id="dropzone" class="dropzone border-4 border-dashed border-gray-300 rounded-3xl p-20 text-center cursor-pointer hover:border-emerald-400 bg-white">
+      <div class="text-7xl mb-6">📄</div>
+      <p class="text-2xl font-semibold text-gray-700">トーク履歴(.txt)をここにドロップ</p>
+      <p class="text-gray-500 mt-2">またはクリックして選択</p>
+      <input type="file" id="file" accept=".txt,text/plain" class="hidden">
+    </div>
 
-        <div class="form-grid">
-          <div class="field field--wide">
-            <label for="file" class="field__label">トーク履歴ファイル</label>
-            <input id="file" class="field__control" type="file" accept=".txt,text/plain" />
-            <p class="field__hint">対応形式: LINEのテキスト出力 .txt</p>
-          </div>
+    <div class="flex gap-4 mt-8 items-center">
+      <select id="encoding" class="px-6 py-4 border border-gray-300 rounded-2xl text-lg">
+        <option value="utf-8">UTF-8（推奨）</option>
+        <option value="shift_jis">Shift_JIS</option>
+      </select>
+      <button id="convert" class="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xl py-5 rounded-3xl transition-all">変換する</button>
+    </div>
 
-          <div class="field">
-            <label for="encoding" class="field__label">文字コード</label>
-            <select id="encoding" class="field__control">
-              <option value="utf-8">UTF-8（推奨）</option>
-              <option value="shift_jis">Shift_JIS</option>
-              <option value="euc-jp">EUC-JP</option>
-            </select>
-          </div>
-        </div>
+    <div id="status" class="mt-6 text-center font-medium min-h-[32px] text-lg"></div>
 
-        <div class="actions">
-          <button id="convert" class="btn btn--primary" type="button">変換する</button>
-          <button id="downloadCsv" class="btn btn--secondary" type="button" disabled>CSV</button>
-          <button id="downloadJson" class="btn btn--secondary" type="button" disabled>JSON</button>
-          <button id="downloadXml" class="btn btn--secondary" type="button" disabled>XML</button>
-        </div>
+    <div id="result" class="hidden mt-10 bg-white rounded-3xl shadow-2xl p-8">
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8" id="stats"></div>
 
-        <div id="status" class="status" aria-live="polite">
-          ファイルを選択して「変換する」を押してください
-        </div>
-      </section>
+      <div class="flex flex-wrap gap-4 mb-6">
+        <input type="text" id="search" placeholder="送信者または本文で検索..." class="flex-1 px-6 py-4 border border-gray-300 rounded-3xl text-lg focus:outline-none focus:border-emerald-500">
+        <select id="sender-filter" class="px-6 py-4 border border-gray-300 rounded-3xl text-lg"></select>
+      </div>
 
-      <section class="summary">
-        <article class="summary-card">
-          <span class="summary-card__label">ファイル名</span>
-          <strong id="filename" class="summary-card__value">-</strong>
-        </article>
-        <article class="summary-card">
-          <span class="summary-card__label">件数</span>
-          <strong id="count" class="summary-card__value">0</strong>
-        </article>
-        <article class="summary-card">
-          <span class="summary-card__label">date空件数</span>
-          <strong id="emptyDateCount" class="summary-card__value">0</strong>
-        </article>
-        <article class="summary-card">
-          <span class="summary-card__label">プレビュー</span>
-          <strong class="summary-card__value"><span id="previewLimitLabel">300</span>件</strong>
-        </article>
-      </section>
+      <div class="flex gap-3 mb-6">
+        <button data-view="table" class="view-btn active px-8 py-3 rounded-3xl font-semibold">テーブル</button>
+        <button data-view="card" class="view-btn px-8 py-3 rounded-3xl font-semibold">カード</button>
+      </div>
 
-      <section class="panel">
-        <div class="panel__header">
-          <h2 class="panel__title">2. プレビュー</h2>
-          <p class="panel__desc">スマホではカード表示、PCではテーブル表示です</p>
-        </div>
+      <div id="table-view" class="overflow-x-auto rounded-2xl border">
+        <table class="w-full">
+          <thead class="bg-gray-50"><tr><th class="text-left py-5 px-6">日付</th><th class="text-left py-5 px-6">時刻</th><th class="text-left py-5 px-6">送信者</th><th class="text-left py-5 px-6">メッセージ</th></tr></thead>
+          <tbody id="table-body" class="divide-y text-gray-700"></tbody>
+        </table>
+      </div>
 
-        <div class="toolbar">
-          <input
-            id="search"
-            class="search"
-            type="search"
-            placeholder="送信者・本文・日付で検索"
-          />
-        </div>
+      <div id="card-view" class="hidden grid grid-cols-1 lg:grid-cols-2 gap-5"></div>
 
-        <div class="table-wrap">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>date</th>
-                <th>time</th>
-                <th>sender</th>
-                <th>message</th>
-              </tr>
-            </thead>
-            <tbody id="rows">
-              <tr>
-                <td colspan="4" class="empty">まだデータがありません</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+      <div class="mt-12 grid grid-cols-2 md:grid-cols-4 gap-4">
+        <button id="dl-csv" class="py-5 bg-blue-600 text-white font-bold rounded-3xl">CSVダウンロード</button>
+        <button id="dl-json" class="py-5 bg-amber-600 text-white font-bold rounded-3xl">JSONダウンロード</button>
+        <button id="dl-xml" class="py-5 bg-purple-600 text-white font-bold rounded-3xl">XMLダウンロード</button>
+        <button id="dl-txt" class="py-5 bg-gray-700 text-white font-bold rounded-3xl">整形TXT</button>
+      </div>
+    </div>
+  </div>
 
-        <div id="mobileCards" class="mobile-cards">
-          <div class="mobile-empty">まだデータがありません</div>
-        </div>
-      </section>
-    </main>
+  <div id="toast" class="hidden fixed bottom-8 right-8 px-8 py-4 rounded-3xl shadow-2xl text-white text-lg"></div>
 
-    <script src="./parser.js"></script>
-    <script src="./app.js"></script>
-  </body>
+  <script src="parser.js"></script>
+  <script src="app.js"></script>
+</body>
 </html>
