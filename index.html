@@ -2,7 +2,7 @@
 <html lang="ja">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>LINEトーク履歴コンバーター</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
@@ -10,44 +10,62 @@
     <main class="container">
       <header class="header">
         <h1>LINEトーク履歴コンバーター</h1>
-        <p class="subtitle">.txt を読み込んで、表表示＆CSV出力</p>
+        <p class="subtitle">.txt を読み込んで CSV / JSON / XML に変換</p>
       </header>
 
       <section class="card">
-        <h2>ファイル入力</h2>
-        <div class="controls">
-          <label class="file-label" for="file">トーク履歴ファイル（.txt）</label>
-          <input id="file" type="file" accept=".txt,text/plain" />
+        <h2>入力</h2>
+        <div class="grid">
+          <div class="field">
+            <label for="file">トーク履歴（.txt）</label>
+            <input id="file" type="file" accept=".txt,text/plain" />
+          </div>
+
+          <div class="field">
+            <label for="encoding">文字コード</label>
+            <select id="encoding">
+              <option value="utf-8">UTF-8（推奨）</option>
+              <option value="shift_jis">Shift_JIS</option>
+              <option value="euc-jp">EUC-JP</option>
+            </select>
+          </div>
         </div>
 
         <div class="actions">
-          <button id="convert" class="btn btn-primary">変換する</button>
-          <button id="downloadCsv" class="btn btn-secondary">CSVをダウンロード</button>
+          <button id="convert" class="btn primary">変換する</button>
+          <button id="downloadCsv" class="btn">CSV</button>
+          <button id="downloadJson" class="btn">JSON</button>
+          <button id="downloadXml" class="btn">XML</button>
         </div>
 
-        <p class="note">
-          このページはローカルで変換処理を行う想定です（サーバー送信なし）。
-        </p>
+        <p id="status" class="status">未処理</p>
       </section>
 
       <section class="card">
-        <h2>変換結果</h2>
-        <div class="table-wrap">
+        <h2>プレビュー</h2>
+        <div class="meta">
+          <span>件数: <b id="count">0</b></span>
+          <span>ファイル名: <b id="filename">-</b></span>
+        </div>
+
+        <div class="table-wrap" id="tableWrap">
           <table>
             <thead>
               <tr>
-                <th>日付</th>
-                <th>時刻</th>
-                <th>送信者</th>
-                <th>メッセージ</th>
+                <th>date</th>
+                <th>time</th>
+                <th>sender</th>
+                <th>message</th>
               </tr>
             </thead>
             <tbody id="rows">
-              <tr>
-                <td colspan="4" class="empty">まだデータがありません</td>
-              </tr>
+              <tr><td colspan="4" class="empty">まだデータがありません</td></tr>
             </tbody>
           </table>
+        </div>
+
+        <div class="preview-note">
+          ※ パフォーマンスのためプレビューは先頭 <b id="previewLimitLabel">500</b> 件のみ表示
         </div>
       </section>
     </main>
