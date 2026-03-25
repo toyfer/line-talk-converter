@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LINEトーク履歴コンバーター</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="container">
+      <header class="header">
+        <h1>LINEトーク履歴コンバーター</h1>
+        <p class="subtitle">.txt を読み込んで、表表示＆CSV出力</p>
+      </header>
+
+      <section class="card">
+        <h2>ファイル入力</h2>
+        <div class="controls">
+          <label class="file-label" for="file">トーク履歴ファイル（.txt）</label>
+          <input id="file" type="file" accept=".txt,text/plain" />
+        </div>
+
+        <div class="actions">
+          <button id="convert" class="btn btn-primary">変換する</button>
+          <button id="downloadCsv" class="btn btn-secondary">CSVをダウンロード</button>
+        </div>
+
+        <p class="note">
+          このページはローカルで変換処理を行う想定です（サーバー送信なし）。
+        </p>
+      </section>
+
+      <section class="card">
+        <h2>変換結果</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>日付</th>
+                <th>時刻</th>
+                <th>送信者</th>
+                <th>メッセージ</th>
+              </tr>
+            </thead>
+            <tbody id="rows">
+              <tr>
+                <td colspan="4" class="empty">まだデータがありません</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
