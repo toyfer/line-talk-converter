@@ -12,7 +12,7 @@ function extractDateFromText(text) {
 }
 
 function isStandaloneDateLine(text) {
-  return /^\d{4}\/(\d{1,2})\/(\d{1,2})\([^)]+\)$/.test(String(text).trim());
+  return /^\d{4}\/\d{1,2}\/\d{1,2}\([^)]+\)$/.test(String(text).trim());
 }
 
 function normalizeTime(time) {
@@ -24,7 +24,7 @@ function normalizeTime(time) {
 function detectType(message) {
   const m = String(message || "").trim();
 
-  if (/^\[(スタンプ|写真|画像|動画|ファイル|URL|音声|位置情報|連絡先|ノート|アルバム|通話)\]$/.test(m)) {
+  if (/^\[(スタンプ|写真|画像|動画|ファイル|URL|音声|位置情報|連絡先|ノート|アルバム)\]$/.test(m)) {
     return m.slice(1, -1);
   }
 
@@ -46,24 +46,20 @@ function parse(text) {
 
     if (!trimmed) continue;
 
-    // [LINE] ヘッダはスキップ
+    // ヘッダ
     if (trimmed.startsWith("[LINE]")) continue;
 
-    // 保存日時行の中に日付が入っているケースを拾う
+    // 保存日時行: 末尾に日付が入っている場合もある
     if (trimmed.startsWith("保存日時")) {
       const found = extractDateFromText(trimmed);
-      if (found) {
-        currentDate = found;
-      }
+      if (found) currentDate = found;
       continue;
     }
 
     // 単独の日付行
     if (isStandaloneDateLine(trimmed)) {
       const found = extractDateFromText(trimmed);
-      if (found) {
-        currentDate = found;
-      }
+      if (found) currentDate = found;
       lastRecord = null;
       continue;
     }
