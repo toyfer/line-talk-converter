@@ -137,7 +137,7 @@ body {
 
 .form-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 220px;
+  grid-template-columns: minmax(0, 1fr) 240px;
   gap: 12px;
   align-items: start;
 }

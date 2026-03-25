@@ -1,164 +1,152 @@
-let allRecords = [];
-let filteredRecords = [];
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>LINEトーク履歴コンバーター</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app">
+      <header class="hero">
+        <div class="hero__inner">
+          <p class="hero__eyebrow">LINE Export Converter</p>
+          <h1 class="hero__title">LINEトーク履歴コンバーター</h1>
+          <p class="hero__desc">
+            LINEのトーク履歴 .txt を読み込み、検索・絞り込み・複数形式出力ができるブラウザ完結型ツールです。
+          </p>
+        </div>
+      </header>
 
-const $ = id => document.getElementById(id);
+      <section class="panel">
+        <div class="panel__header">
+          <h2 class="panel__title">1. ファイルを選択</h2>
+          <p class="panel__desc">
+            .txt を選択、または下の領域にドロップしてください。
+          </p>
+        </div>
 
-function showToast(msg, isError = false) {
-  const toast = $('toast');
-  toast.textContent = msg;
-  toast.style.backgroundColor = isError ? '#ef4444' : '#10b981';
-  toast.classList.remove('hidden');
-  setTimeout(() => toast.classList.add('hidden'), 2800);
-}
+        <div id="dropzone" class="dropzone" role="button" tabindex="0" aria-label="ファイルを選択">
+          <div class="dropzone__icon">📄</div>
+          <div class="dropzone__text">
+            <strong>ファイルをドロップ</strong>
+            <span>またはクリックして選択</span>
+          </div>
+          <input id="file" type="file" accept=".txt,text/plain" hidden />
+        </div>
 
-$('dropzone').addEventListener('click', () => $('file').click());
-$('file').addEventListener('change', e => e.target.files[0] && handleFile(e.target.files[0]));
+        <div class="form-grid">
+          <div class="field field--wide">
+            <label for="encoding" class="field__label">文字コード</label>
+            <select id="encoding" class="field__control">
+              <option value="utf-8">UTF-8（推奨）</option>
+              <option value="shift_jis">Shift_JIS</option>
+              <option value="euc-jp">EUC-JP</option>
+              <option value="iso-8859-1">ISO-8859-1</option>
+            </select>
+          </div>
 
-const dropzone = $('dropzone');
-dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.style.borderColor = '#10b981'; });
-dropzone.addEventListener('dragleave', () => dropzone.style.borderColor = '#d1d5db');
-dropzone.addEventListener('drop', e => {
-  e.preventDefault();
-  dropzone.style.borderColor = '#d1d5db';
-  if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
-});
+          <div class="field">
+            <label for="previewLimit" class="field__label">プレビュー件数</label>
+            <select id="previewLimit" class="field__control">
+              <option value="100">100件</option>
+              <option value="300" selected>300件</option>
+              <option value="500">500件</option>
+              <option value="1000">1000件</option>
+            </select>
+          </div>
+        </div>
 
-async function handleFile(file) {
-  $('status').innerHTML = '📂 ファイルを読み込んでいます...';
-  try {
-    const text = await new Promise((res, rej) => {
-      const r = new FileReader();
-      r.onload = () => res(r.result);
-      r.onerror = rej;
-      r.readAsText(file, $('encoding').value);
-    });
+        <div class="actions">
+          <button id="convert" class="btn btn--primary" type="button">変換する</button>
+          <button id="downloadCsv" class="btn btn--secondary" type="button" disabled>CSV</button>
+          <button id="downloadJson" class="btn btn--secondary" type="button" disabled>JSON</button>
+          <button id="downloadXml" class="btn btn--secondary" type="button" disabled>XML</button>
+          <button id="downloadTxt" class="btn btn--secondary" type="button" disabled>TXT</button>
+          <button id="downloadHtml" class="btn btn--secondary" type="button" disabled>HTML</button>
+          <button id="downloadMd" class="btn btn--secondary" type="button" disabled>Markdown</button>
+          <button id="downloadTsv" class="btn btn--secondary" type="button" disabled>TSV</button>
+        </div>
 
-    allRecords = LineTalkParser.parse(text);
-    filteredRecords = [...allRecords];
+        <div id="status" class="status" aria-live="polite">
+          ファイルを選択してください。
+        </div>
+      </section>
 
-    renderStats();
-    renderSenderFilter();
-    renderPreview();
-    $('result').classList.remove('hidden');
-    showToast(`${allRecords.length}件のトークを変換しました`);
-  } catch (err) {
-    showToast('処理中にエラーが発生しました', true);
-  }
-}
+      <section id="summary" class="summary" hidden>
+        <article class="summary-card">
+          <span class="summary-card__label">ファイル名</span>
+          <strong id="summaryFilename" class="summary-card__value">-</strong>
+        </article>
+        <article class="summary-card">
+          <span class="summary-card__label">総件数</span>
+          <strong id="summaryCount" class="summary-card__value">0</strong>
+        </article>
+        <article class="summary-card">
+          <span class="summary-card__label">date欠損</span>
+          <strong id="summaryMissingDate" class="summary-card__value">0</strong>
+        </article>
+        <article class="summary-card">
+          <span class="summary-card__label">送信者数</span>
+          <strong id="summarySenderCount" class="summary-card__value">0</strong>
+        </article>
+        <article class="summary-card">
+          <span class="summary-card__label">期間</span>
+          <strong id="summaryRange" class="summary-card__value">-</strong>
+        </article>
+        <article class="summary-card">
+          <span class="summary-card__label">特殊件数</span>
+          <strong id="summarySpecial" class="summary-card__value">0</strong>
+        </article>
+      </section>
 
-function renderStats() {
-  const empty = allRecords.filter(r => !r.date).length;
-  const senders = new Set(allRecords.map(r => r.sender)).size;
-  $('stats').innerHTML = `
-    <div class="bg-white p-6 rounded-3xl shadow text-center"><div class="text-sm text-gray-500">総件数</div><div class="text-4xl font-bold text-emerald-600">${allRecords.length}</div></div>
-    <div class="bg-white p-6 rounded-3xl shadow text-center"><div class="text-sm text-gray-500">送信者</div><div class="text-4xl font-bold">${senders}</div></div>
-    <div class="bg-white p-6 rounded-3xl shadow text-center"><div class="text-sm text-gray-500">date欠損</div><div class="text-4xl font-bold text-amber-600">${empty}</div></div>
-  `;
-}
+      <section id="resultPanel" class="panel" hidden>
+        <div class="panel__header">
+          <h2 class="panel__title">2. フィルタとプレビュー</h2>
+          <p class="panel__desc">
+            送信者・日付・キーワードで絞り込みできます。
+          </p>
+        </div>
 
-function renderSenderFilter() {
-  const select = $('sender-filter');
-  select.innerHTML = '<option value="">すべての送信者</option>';
-  const senders = [...new Set(allRecords.map(r => r.sender))].sort();
-  senders.forEach(s => {
-    const opt = document.createElement('option');
-    opt.value = s;
-    opt.textContent = s;
-    select.appendChild(opt);
-  });
-}
+        <div class="toolbar toolbar--grid">
+          <input id="search" class="search" type="search" placeholder="送信者・本文・日付で検索" />
+          <select id="senderFilter" class="search">
+            <option value="">すべての送信者</option>
+          </select>
+          <input id="dateFrom" class="search" type="date" />
+          <input id="dateTo" class="search" type="date" />
+        </div>
 
-function renderPreview() {
-  const tbody = $('table-body');
-  tbody.innerHTML = '';
+        <div class="view-switch">
+          <button id="tableViewBtn" class="view-switch__btn is-active" type="button">テーブル</button>
+          <button id="cardViewBtn" class="view-switch__btn" type="button">カード</button>
+          <button id="statsViewBtn" class="view-switch__btn" type="button">統計</button>
+        </div>
 
-  const cardView = $('card-view');
-  cardView.innerHTML = '';
+        <div id="tableView" class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th scope="col">date</th>
+                <th scope="col">time</th>
+                <th scope="col">sender</th>
+                <th scope="col">type</th>
+                <th scope="col">message</th>
+              </tr>
+            </thead>
+            <tbody id="tableBody">
+              <tr><td colspan="5" class="empty">まだデータがありません</td></tr>
+            </tbody>
+          </table>
+        </div>
 
-  filteredRecords.forEach(r => {
-    // テーブル行
-    const tr = document.createElement('tr');
-    tr.className = 'hover:bg-emerald-50';
-    tr.innerHTML = `<td class="py-5 px-6">${r.date}</td><td class="py-5 px-6">${r.time}</td><td class="py-5 px-6 font-medium">${r.sender}</td><td class="py-5 px-6 whitespace-pre-wrap">${r.message}</td>`;
-    tbody.appendChild(tr);
+        <div id="cardView" class="card-list" hidden></div>
+        <div id="statsView" class="stats-view" hidden></div>
+      </section>
 
-    // カード
-    const card = document.createElement('div');
-    card.className = 'bg-white border border-gray-100 rounded-3xl p-6 shadow-sm';
-    card.innerHTML = `
-      <div class="flex justify-between text-sm text-gray-500 mb-3">
-        <span>${r.date} ${r.time}</span>
-        <span class="bg-emerald-100 text-emerald-700 px-4 py-1 rounded-3xl">${r.sender}</span>
-      </div>
-      <div class="whitespace-pre-wrap text-gray-700 leading-relaxed">${r.message}</div>
-    `;
-    cardView.appendChild(card);
-  });
-}
+      <div id="toast" class="toast" hidden></div>
+    </main>
 
-// フィルタリング
-function applyFilter() {
-  const keyword = $('search').value.toLowerCase();
-  const sender = $('sender-filter').value;
-
-  filteredRecords = allRecords.filter(r => {
-    const matchKeyword = !keyword || 
-      r.sender.toLowerCase().includes(keyword) || 
-      r.message.toLowerCase().includes(keyword);
-    const matchSender = !sender || r.sender === sender;
-    return matchKeyword && matchSender;
-  });
-
-  renderPreview();
-}
-
-$('search').addEventListener('input', applyFilter);
-$('sender-filter').addEventListener('change', applyFilter);
-
-// ビュー切替
-document.querySelectorAll('.view-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    const isTable = btn.dataset.view === 'table';
-    $('table-view').classList.toggle('hidden', !isTable);
-    $('card-view').classList.toggle('hidden', isTable);
-  });
-});
-
-// ダウンロード機能
-function download(content, filename, type) {
-  const blob = new Blob([content], {type});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
-$('dl-csv').onclick = () => {
-  let csv = "date,time,sender,message\n";
-  csv += allRecords.map(r => `"${r.date}","${r.time}","${r.sender}","${r.message.replace(/"/g,'""')}"`).join('\n');
-  download(csv, 'line_talk.csv', 'text/csv;charset=utf-8;');
-};
-
-$('dl-json').onclick = () => download(JSON.stringify(allRecords, null, 2), 'line_talk.json', 'application/json');
-$('dl-xml').onclick = () => {
-  let xml = '<?xml version="1.0" encoding="UTF-8"?>\n<talk>\n';
-  allRecords.forEach(r => {
-    xml += `  <message date="${r.date}" time="${r.time}" sender="${r.sender}"><![CDATA[${r.message}]]></message>\n`;
-  });
-  xml += '</talk>';
-  download(xml, 'line_talk.xml', 'application/xml');
-};
-
-$('dl-txt').onclick = () => {
-  let txt = '[LINE] トーク履歴\n\n';
-  allRecords.forEach(r => {
-    txt += `${r.date} ${r.time} ${r.sender}\n${r.message}\n\n`;
-  });
-  download(txt, 'line_talk.txt', 'text/plain;charset=utf-8;');
-};
-
-showToast('準備完了。トーク履歴.txtをアップロードしてください');
+    <script src="./app.js"></script>
+  </body>
+</html>

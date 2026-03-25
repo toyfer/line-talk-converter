@@ -19,7 +19,12 @@ function normalizeTime(time) {
 
 function detectType(message) {
   const m = String(message || "").trim();
-  if (/^\[(スタンプ|写真|画像|動画|ファイル|URL|音声|位置情報|連絡先)\]$/.test(m)) return m.slice(1, -1);
+
+  if (/^\[(スタンプ|写真|画像|動画|ファイル|URL|音声|位置情報|連絡先|ノート|アルバム|通話)\]$/.test(m)) {
+    return m.slice(1, -1);
+  }
+
+  if (/^☎\s/.test(m)) return "call";
   if (/^https?:\/\//i.test(m)) return "url";
   return "text";
 }
@@ -46,26 +51,58 @@ function parse(text) {
       continue;
     }
 
+    // 通常メッセージ: time + sender + message
     let m = line.match(/^(\d{1,2}:\d{2})\t([^\t]+)\t([\s\S]*)$/);
+    let system = false;
+
+    // システムメッセージ: time + message
+    if (!m) {
+      m = line.match(/^(\d{1,2}:\d{2})\t([\s\S]*)$/);
+      system = !!m;
+    }
+
+    // スペース区切り救済
     if (!m) {
       m = line.match(/^(\d{1,2}:\d{2})\s{2,}(.+?)\s{2,}([\s\S]*)$/);
     }
 
     if (m) {
+      const time = normalizeTime(m[1]);
+
+      if (system && m.length >= 3) {
+        const message = m[2] ?? "";
+        lastRecord = {
+          date: currentDate,
+          time,
+          sender: "",
+          type: detectType(message) === "text" ? "system" : detectType(message),
+          message
+        };
+        records.push(lastRecord);
+        continue;
+      }
+
+      const sender = m[2] ? String(m[2]).trim() : "";
       const message = m[3] ?? "";
+      const type = detectType(message);
+
       lastRecord = {
         date: currentDate,
-        time: normalizeTime(m[1]),
-        sender: m[2].trim(),
-        message,
-        type: detectType(message)
+        time,
+        sender,
+        type,
+        message
       };
       records.push(lastRecord);
       continue;
     }
 
+    // 継続行
     if (lastRecord) {
       lastRecord.message += `\n${line}`;
+      if (lastRecord.type === "text") {
+        lastRecord.type = detectType(lastRecord.message);
+      }
     }
   }
 
