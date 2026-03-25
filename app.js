@@ -245,8 +245,7 @@
   }
 
   function updateSummary(meta) {
-    const filenamestr = `${state.originalFileName || "-"} (${formatFileSize(meta.fileSize || 0)})`;
-    el.summaryFilename.textContent = filenamestr;
+    el.summaryFilename.textContent = `${state.originalFileName || "-"} (${formatFileSize(meta.fileSize || 0)})`;
     el.summaryCount.textContent = String(meta.recordCount || 0);
     el.summaryMissingDate.textContent = String(meta.emptyDateCount || 0);
     el.summarySenderCount.textContent = String(meta.senderCount || 0);
@@ -338,11 +337,11 @@
     for (let i = 0; i < max; i++) {
       const r = records[i];
       const tr = document.createElement("tr");
-      tr.appendChild(cell(r.date));
-      tr.appendChild(cell(r.time));
-      tr.appendChild(cell(r.sender));
-      tr.appendChild(cell(r.type));
-      tr.appendChild(cell(r.message));
+      tr.appendChild(cell(r.date || ""));
+      tr.appendChild(cell(r.time || ""));
+      tr.appendChild(cell(r.sender || ""));
+      tr.appendChild(cell(r.type || ""));
+      tr.appendChild(cell(r.message || ""));
       fragment.appendChild(tr);
     }
 

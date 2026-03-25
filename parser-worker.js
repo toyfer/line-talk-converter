@@ -5,10 +5,14 @@ function normalizeLineBreaks(text) {
     .split("\n");
 }
 
-function normalizeDate(dateLine) {
-  const m = String(dateLine).match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})\([^)]+\)$/);
+function extractDateFromText(text) {
+  const m = String(text).match(/(\d{4})\/(\d{1,2})\/(\d{1,2})\([^)]+\)/);
   if (!m) return "";
   return `${m[1]}-${String(m[2]).padStart(2, "0")}-${String(m[3]).padStart(2, "0")}`;
+}
+
+function isStandaloneDateLine(text) {
+  return /^\d{4}\/(\d{1,2})\/(\d{1,2})\([^)]+\)$/.test(String(text).trim());
 }
 
 function normalizeTime(time) {
@@ -41,12 +45,25 @@ function parse(text) {
     const trimmed = line.trim();
 
     if (!trimmed) continue;
-    if (trimmed.startsWith("[LINE]")) continue;
-    if (trimmed.startsWith("保存日時")) continue;
 
-    const maybeDate = normalizeDate(trimmed);
-    if (maybeDate) {
-      currentDate = maybeDate;
+    // [LINE] ヘッダはスキップ
+    if (trimmed.startsWith("[LINE]")) continue;
+
+    // 保存日時行の中に日付が入っているケースを拾う
+    if (trimmed.startsWith("保存日時")) {
+      const found = extractDateFromText(trimmed);
+      if (found) {
+        currentDate = found;
+      }
+      continue;
+    }
+
+    // 単独の日付行
+    if (isStandaloneDateLine(trimmed)) {
+      const found = extractDateFromText(trimmed);
+      if (found) {
+        currentDate = found;
+      }
       lastRecord = null;
       continue;
     }
