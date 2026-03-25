@@ -7,69 +7,112 @@
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <main class="container">
-      <header class="header">
-        <h1>LINEトーク履歴コンバーター</h1>
-        <p class="subtitle">.txt を読み込んで CSV / JSON / XML に変換</p>
-      </header>
+    <header class="site-header" role="banner">
+      <div class="site-header__inner">
+        <h1 class="site-header__title">LINEトーク履歴コンバーター</h1>
+        <p class="site-header__sub">.txt → CSV / JSON / XML に変換（すべてローカル処理）</p>
+      </div>
+    </header>
 
-      <section class="card">
-        <h2>入力</h2>
-        <div class="grid">
+    <main class="main" role="main">
+      <!-- ===== 入力セクション ===== -->
+      <section class="card" aria-labelledby="input-heading">
+        <h2 id="input-heading" class="card__title">入力</h2>
+
+        <div class="form-grid">
           <div class="field">
-            <label for="file">トーク履歴（.txt）</label>
-            <input id="file" type="file" accept=".txt,text/plain" />
+            <label for="file" class="field__label">トーク履歴ファイル（.txt）</label>
+            <input
+              id="file"
+              type="file"
+              accept=".txt,text/plain"
+              class="field__input"
+              aria-describedby="file-hint"
+            />
+            <p id="file-hint" class="field__hint">LINEアプリ &gt; トーク設定 &gt; トーク履歴を送信 で出力されたファイル</p>
           </div>
 
           <div class="field">
-            <label for="encoding">文字コード</label>
-            <select id="encoding">
-              <option value="utf-8">UTF-8（推奨）</option>
-              <option value="shift_jis">Shift_JIS</option>
-              <option value="euc-jp">EUC-JP</option>
+            <label for="encoding" class="field__label">文字コード</label>
+            <select id="encoding" class="field__input field__input--select">
+              <option value="UTF-8" selected>UTF-8（推奨）</option>
+              <option value="Shift_JIS">Shift_JIS</option>
+              <option value="EUC-JP">EUC-JP</option>
+              <option value="ISO-8859-1">Latin-1</option>
             </select>
           </div>
         </div>
 
-        <div class="actions">
-          <button id="convert" class="btn primary">変換する</button>
-          <button id="downloadCsv" class="btn">CSV</button>
-          <button id="downloadJson" class="btn">JSON</button>
-          <button id="downloadXml" class="btn">XML</button>
+        <div class="actions" role="group" aria-label="アクション">
+          <button id="convert" class="btn btn--primary" type="button">
+            <span class="btn__label">変換する</span>
+          </button>
+          <button id="downloadCsv" class="btn btn--download" type="button" disabled aria-disabled="true">
+            <span class="btn__label">CSV</span>
+          </button>
+          <button id="downloadJson" class="btn btn--download" type="button" disabled aria-disabled="true">
+            <span class="btn__label">JSON</span>
+          </button>
+          <button id="downloadXml" class="btn btn--download" type="button" disabled aria-disabled="true">
+            <span class="btn__label">XML</span>
+          </button>
         </div>
 
-        <p id="status" class="status">未処理</p>
+        <!-- ステータス -->
+        <div
+          id="status"
+          class="status"
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+        >
+          ファイルを選択して「変換する」を押してください
+        </div>
       </section>
 
-      <section class="card">
-        <h2>プレビュー</h2>
-        <div class="meta">
-          <span>件数: <b id="count">0</b></span>
-          <span>ファイル名: <b id="filename">-</b></span>
+      <!-- ===== プレビューセクション ===== -->
+      <section class="card" aria-labelledby="preview-heading">
+        <div class="card__header-row">
+          <h2 id="preview-heading" class="card__title">プレビュー</h2>
+          <div class="stats" aria-label="統計" id="stats" hidden>
+            <span id="count"></span>
+            <span class="stats__sep" aria-hidden="true">|</span>
+            <span id="filename"></span>
+            <span class="stats__sep" aria-hidden="true">|</span>
+            <span id="filesize"></span>
+          </div>
         </div>
 
-        <div class="table-wrap" id="tableWrap">
-          <table>
+        <div class="table-container" id="tableContainer" role="region" aria-label="トーク一覧">
+          <table class="data-table" id="dataTable" aria-describedby="preview-note">
             <thead>
               <tr>
-                <th>date</th>
-                <th>time</th>
-                <th>sender</th>
-                <th>message</th>
+                <th scope="col" abbr="date">date</th>
+                <th scope="col" abbr="time">time</th>
+                <th scope="col" abbr="sender">sender</th>
+                <th scope="col" abbr="message">message</th>
               </tr>
             </thead>
-            <tbody id="rows">
-              <tr><td colspan="4" class="empty">まだデータがありません</td></tr>
+            <tbody id="rows" aria-live="polite">
+              <tr><td colspan="4" class="empty">変換結果がここに表示されます</td></tr>
             </tbody>
           </table>
         </div>
 
-        <div class="preview-note">
-          ※ パフォーマンスのためプレビューは先頭 <b id="previewLimitLabel">500</b> 件のみ表示
-        </div>
+        <p id="preview-note" class="preview-note" aria-hidden="true">
+          プレビューは先頭 <strong id="previewLimitLabel">500</strong> 件を表示（出力ファイルには全件 포함）
+        </p>
       </section>
     </main>
 
+    <footer class="site-footer" role="contentinfo">
+      <p>
+        このサービスはブラウザ ローカルでのみ動作します。ファイルは外部に送信されません。
+      </p>
+    </footer>
+
+    <!-- パイプライン -->
+    <script src="./parser.js"></script>
     <script src="./app.js"></script>
   </body>
 </html>
